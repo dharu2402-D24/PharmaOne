@@ -1,0 +1,35 @@
+# ========================
+# PharmaOne .gitignore
+# ========================
+
+# Compiled class files
+out/
+*.class
+
+# JAR build artifacts (generate fresh with build.bat / build.sh)
+PharmaOne.jar
+PharmaOne-Standalone.jar
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# VS Code
+.vscode/
+
+# Stitch AI design tool
+.stitch/
+stitch_remix_of_inventory_catalog_list/
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log

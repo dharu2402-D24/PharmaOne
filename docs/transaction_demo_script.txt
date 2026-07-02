@@ -1,0 +1,199 @@
+===============================================================
+  TASK 6 — DEMO SCRIPT: How to Explain Each Transaction
+===============================================================
+  Use this as your talking points during the 2-minute demo.
+  Open the app → click "Transactions" in the sidebar.
+  Run each scenario and explain while the log fills up.
+===============================================================
+
+
+SCENARIO 1: COMMIT (Atomicity)
+-------------------------------
+WHAT TO SAY:
+"This demonstrates the ATOMICITY property of ACID transactions.
+ We have a business rule: when we sell medicine, we need to do
+ two things — insert a Sales Order AND deduct from Inventory.
+ Both must succeed together, or neither should happen.
+
+ Watch the log — I'm starting a transaction, inserting the order,
+ then deducting 50 units from Batch 103 (Limcee). Neither change
+ is visible to other users yet because we haven't committed.
+
+ Now I COMMIT — both changes become permanent atomically.
+ You can see in the AFTER table that the quantity dropped by 50
+ and the order was created.
+
+ The cleanup restores the original state for the next demo."
+
+KEY CONCEPT: Atomicity — all or nothing. The two operations are
+treated as a single unit of work.
+
+
+SCENARIO 2: ROLLBACK (Consistency)
+-----------------------------------
+WHAT TO SAY:
+"Now let's see what happens when something goes WRONG mid-transaction.
+ We try to sell 99,999 units of Limcee — way more than we have.
+
+ Step 1 succeeds — the Sales Order gets inserted into the transaction.
+ But Step 2 FAILS — the UPDATE is rejected because our database has
+ a CHECK constraint: quantity_available must be >= 0. MySQL won't
+ let the inventory go negative.
+
+ This is the CONSISTENCY property — the database itself enforces
+ our business rules through constraints.
+
+ But wait — the Sales Order from Step 1 is still sitting in the
+ transaction! If we committed now, we'd have an order with no
+ inventory deduction. So we ROLLBACK.
+
+ After rollback, BOTH changes are undone. The Sales Order is gone,
+ inventory is unchanged. The database is back to a consistent state."
+
+KEY CONCEPTS:
+  - Consistency — CHECK constraints enforce business rules
+  - Rollback — undoes ALL changes in a transaction, not just the failed one
+  - The order from Step 1 was undone even though it succeeded individually
+
+
+SCENARIO 3: DIRTY READ PREVENTION (Isolation)
+----------------------------------------------
+WHAT TO SAY:
+"This demonstrates ISOLATION — how the database handles concurrent
+ access. We have two separate database sessions, like two users
+ working at the same time.
+
+ Session A starts a transaction and changes Batch 103's quantity
+ to 9999 — but does NOT commit yet. The change is 'dirty' because
+ it hasn't been finalized.
+
+ Now Session B tries to read that same row.
+
+ With READ COMMITTED isolation (the default), Session B sees the
+ ORIGINAL value — not 9999. The dirty read is PREVENTED. This is
+ safe because Session A might still rollback.
+
+ With READ UNCOMMITTED, Session B can see the uncommitted 9999.
+ This is called a DIRTY READ — it's dangerous because if Session A
+ rolls back, Session B will have acted on data that never existed.
+
+ Finally, Session A rolls back and nothing persists. This shows
+ why READ COMMITTED is the safe default."
+
+KEY CONCEPTS:
+  - Isolation levels control what concurrent sessions can see
+  - READ COMMITTED prevents dirty reads (safe default)
+  - READ UNCOMMITTED allows dirty reads (dangerous)
+  - MVCC (Multi-Version Concurrency Control) — InnoDB's mechanism
+
+
+SCENARIO 4: LOST UPDATE (Concurrency Conflict)
+-----------------------------------------------
+WHAT TO SAY:
+"This is the most important concurrency problem — the Lost Update.
+
+ PART A — THE PROBLEM:
+ Two sessions both read the inventory: 1500 units.
+ Session A subtracts 200, writes 1300, commits.
+ Session B also subtracts 300, but it still thinks the original
+ was 1500, so it writes 1200, commits.
+
+ The expected result should be 1500 - 200 - 300 = 1000.
+ But we got 1200. Session A's deduction of 200 was COMPLETELY LOST.
+ This is the 'lost update' problem.
+
+ PART B — THE FIX:
+ We use SELECT ... FOR UPDATE, which is called pessimistic locking.
+ When Session A does SELECT FOR UPDATE, it LOCKS the row.
+ Session B's SELECT FOR UPDATE has to WAIT until Session A commits.
+
+ Now Session B reads 1300 (the correct post-A value), subtracts 300,
+ and writes 1000. Both deductions are preserved!
+
+ This is how real banking systems, e-commerce sites, and inventory
+ systems prevent data loss during concurrent access."
+
+KEY CONCEPTS:
+  - Lost Update — a classic concurrency bug
+  - SELECT ... FOR UPDATE — pessimistic locking / row-level lock
+  - The lock forces serialization of conflicting operations
+  - Real-world importance: bank transfers, ticket booking, inventory
+
+
+SCENARIO 5: DEADLOCK (Detection & Resolution)
+----------------------------------------------
+WHAT TO SAY:
+"Finally, what happens when locking goes wrong — a DEADLOCK.
+
+ Session A locks Batch 103, then tries to lock Batch 106.
+ Session B locks Batch 106, then tries to lock Batch 103.
+
+ Now both are stuck — Session A is waiting for B to release 106,
+ and Session B is waiting for A to release 103. It's a circular
+ wait. Neither can proceed.
+
+ MySQL has a built-in deadlock detector. Within seconds, it
+ identifies the circular dependency and picks a VICTIM — one
+ session gets killed with Error 1213: 'Deadlock found when
+ trying to get lock'.
+
+ The victim's transaction is automatically rolled back by MySQL.
+ The survivor's transaction completes successfully.
+
+ Most importantly — NO DATA IS CORRUPTED. The database maintains
+ consistency even when deadlocks occur. In real applications,
+ the victim would simply retry the transaction."
+
+KEY CONCEPTS:
+  - Deadlock — circular wait between two or more sessions
+  - MySQL detects deadlocks automatically (wait-for graph)
+  - Victim selection — MySQL picks the cheaper transaction to kill
+  - Application should catch Error 1213 and retry
+  - Database consistency is maintained even during deadlocks
+
+
+===============================================================
+  SUMMARY — ACID PROPERTIES DEMONSTRATED
+===============================================================
+
+  A — Atomicity:    Scenario 1 (COMMIT all-or-nothing)
+  C — Consistency:  Scenario 2 (CHECK constraint + ROLLBACK)
+  I — Isolation:    Scenario 3 (Dirty read prevention)
+  D — Durability:   Scenario 1 (COMMIT makes changes permanent)
+
+  Concurrency:      Scenario 4 (Lost Update + FOR UPDATE fix)
+  Deadlock:         Scenario 5 (Detection & automatic resolution)
+
+===============================================================
+  POSSIBLE EVALUATOR QUESTIONS & ANSWERS
+===============================================================
+
+Q: "Why did you use multiple connections instead of multiple users?"
+A: "MySQL handles concurrency at the connection level, not the user
+    level. Each JDBC connection is an independent session. Two
+    connections as 'root' can conflict with each other exactly like
+    two different users would. The locking and isolation mechanisms
+    are session-based."
+
+Q: "What isolation level does MySQL use by default?"
+A: "MySQL InnoDB uses REPEATABLE READ by default. However, most
+    applications set it to READ COMMITTED for better concurrency.
+    Our demo shows both READ COMMITTED and READ UNCOMMITTED."
+
+Q: "How does SELECT FOR UPDATE differ from a regular SELECT?"
+A: "A regular SELECT in InnoDB uses MVCC and never blocks — it reads
+    a snapshot. SELECT FOR UPDATE acquires an exclusive row lock,
+    blocking other FOR UPDATE and UPDATE statements on the same row
+    until the transaction commits or rolls back."
+
+Q: "What happens in a real application when a deadlock occurs?"
+A: "The application catches the SQLException (error code 1213) and
+    retries the transaction. Most ORMs and frameworks have built-in
+    retry logic for deadlocks. Our Java panel shows this catch block."
+
+Q: "Why does the CHECK constraint prevent the negative inventory?"
+A: "We defined the Inventory table with:
+    quantity_available INT NOT NULL CHECK (quantity_available >= 0)
+    MySQL validates this constraint on every UPDATE. If violated,
+    the UPDATE fails immediately, protecting data integrity at the
+    database level — regardless of application bugs."
