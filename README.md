@@ -22,8 +22,6 @@ A full-featured **Java Swing** desktop application for managing pharmaceutical i
 |:------:|:-----------:|
 | ![Orders](docs/screenshots/orders.png) | ![SQL Console](docs/screenshots/sql_console.png) |
 
-> **To add screenshots:** Run the app, take screenshots, save them in `docs/screenshots/`, and update the paths above.
-
 ---
 
 ## 🎬 Demo Video
